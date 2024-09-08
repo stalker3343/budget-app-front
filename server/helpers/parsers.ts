@@ -1,11 +1,10 @@
-// export function gazpromParser(inputString) {
 interface Spending {
   source: string;
   amount: number;
   category: string;
   type: "income" | "expense";
-  cashback: number | null;
   status?: "completed" | "failed";
+  cashback: number | null;
 }
 
 export function gazpromParser(text: string): Spending[] {
@@ -23,6 +22,7 @@ export function gazpromParser(text: string): Spending[] {
     let category = "";
     let type: "income" | "expense" = "expense";
     let status: "completed" | "failed" = "completed";
+    let cashback: number | null = null;
 
     // Parse the first line for source and amount
     const firstLine = lines[i];
@@ -38,15 +38,26 @@ export function gazpromParser(text: string): Spending[] {
     // Move to the next line
     i++;
 
-    // Parse the second line for category
+    // Parse the second line for category and cashback
     if (i < lines.length) {
-      category = lines[i];
+      const secondLine = lines[i];
+
+      // Check for cashback pattern "+<amount> Б"
+      const cashbackMatch = secondLine.match(/\+([\d\s,.]+)\s*Б/);
+      if (cashbackMatch) {
+        cashback = parseFloat(
+          cashbackMatch[1].replace(/\s+/g, "").replace(",", ".")
+        );
+        category = secondLine.replace(cashbackMatch[0], "").trim(); // Remove cashback part from category
+      } else {
+        category = secondLine; // No cashback, treat entire line as category
+      }
     }
 
     // Move to the next line
     i++;
 
-    // Check for transfer (if there's time or "Операция не выполнена")
+    // Check for special cases (failed operation or transfer time)
     if (i < lines.length) {
       const nextLine = lines[i];
       if (nextLine.includes("Операция не выполнена")) {
@@ -65,11 +76,9 @@ export function gazpromParser(text: string): Spending[] {
       category,
       type,
       status,
+      cashback,
     });
   }
 
   return spendings;
 }
-
-//   return inputString;
-// }

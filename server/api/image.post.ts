@@ -7,7 +7,6 @@ import { IncomingForm } from "formidable";
 import fs from "fs";
 import path from "path";
 import { gazpromParser } from "../helpers/parsers";
-
 export default defineEventHandler(async (event) => {
   // Read the query from the request body
   const form = new IncomingForm();
