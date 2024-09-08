@@ -7,6 +7,17 @@ interface Spending {
   cashback: number | null;
 }
 
+/**
+ * Clean the source string by trimming non-alphabetical characters from both ends.
+ * @param source - The raw source string to clean.
+ * @returns The cleaned source.
+ */
+function cleanSource(source: string): string {
+  // Regular expression to match the first and last valid alphabetic character (Russian or English)
+  const match = source.match(/[A-Za-zА-Яа-я].*[A-Za-zА-Яа-я]/);
+  return match ? match[0].trim() : source.trim();
+}
+
 export function gazpromParser(text: string): Spending[] {
   const lines = text
     .split("\n")
@@ -29,7 +40,7 @@ export function gazpromParser(text: string): Spending[] {
     const match = firstLine.match(/(.+?)([+-])([\d\s,.]+)\s*Р/);
 
     if (match) {
-      source = match[1].trim();
+      source = cleanSource(match[1].trim()); // Clean the source
       const sign = match[2]; // + or -
       amount = parseFloat(match[3].replace(/\s+/g, "").replace(",", "."));
       type = sign === "+" ? "income" : "expense";
