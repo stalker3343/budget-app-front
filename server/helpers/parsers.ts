@@ -37,6 +37,7 @@ export function gazpromParser(text: string): Spending[] {
 
     // Parse the first line for source and amount
     const firstLine = lines[i];
+    // Adjusted regex to handle both cases: with or without space before 'Р'
     const match = firstLine.match(/(.+?)([+-])([\d\s,.]+)\s*Р/);
 
     if (match) {
