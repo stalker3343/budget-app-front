@@ -1,11 +1,4 @@
-interface Spending {
-  source: string;
-  amount: number;
-  category: string;
-  type: "income" | "expense";
-  status?: "completed" | "failed";
-  cashback: number | null;
-}
+import { BankRecord } from "../types";
 
 /**
  * Clean the source string by trimming non-alphabetical characters from both ends.
@@ -18,12 +11,12 @@ function cleanSource(source: string): string {
   return match ? match[0].trim() : source.trim();
 }
 
-export function gazpromParser(text: string): Spending[] {
+export function gazpromParser(text: string): BankRecord[] {
   const lines = text
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-  const spendings: Spending[] = [];
+  const spendings: BankRecord[] = [];
 
   let i = 0;
 
@@ -38,7 +31,7 @@ export function gazpromParser(text: string): Spending[] {
     // Parse the first line for source and amount
     const firstLine = lines[i];
     // Adjusted regex to handle both cases: with or without space before 'Р'
-    const match = firstLine.match(/(.+?)([+-])([\d\s,.]+)\s*Р/);
+    const match = firstLine.match(/(.+?)([+-—])([\d\s,.]+)\s*[РP]/);
 
     if (match) {
       source = cleanSource(match[1].trim()); // Clean the source
@@ -72,7 +65,7 @@ export function gazpromParser(text: string): Spending[] {
     // Check for special cases (failed operation or transfer time)
     if (i < lines.length) {
       const nextLine = lines[i];
-      if (nextLine.includes("Операция не выполнена")) {
+      if (nextLine.toLowerCase().includes("операция не выполнена")) {
         status = "failed";
         i++; // Skip this line
       } else if (/^\d{2}:\d{2}$/.test(nextLine)) {

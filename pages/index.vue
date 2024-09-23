@@ -1,133 +1,308 @@
 <template>
+  <div>
+    <input type="file" @change="handleFileChange" />
+    <VBtn :loading="isPendinguploadImageMutate" @click="uploadImage">Загрузить</VBtn>
+
+    <AccountsList v-model="selectedAccount"></AccountsList>
+    <input style="font-size: 18px;" class="mb-2" type="date" v-model="selectedDate">
 
 
-    <div v-if="categoriesData && accountsData && accountbalancesData">
+    <div v-if="initParsedResults" class="spending-list">
+      <div v-for="(spending, index) in normalizedParsedResults" :key="index" class="card" :class="spending.type">
+        <!-- Status Indicator -->
+        <div class="status-indicator" :class="spending.status === 'completed' ? 'status-green' : 'status-red'"></div>
+        <div v-if="spending.cashback" class="cashback-indicator">
+          <span>+ {{ spending.cashback }}Б</span>
+        </div>
+        <!-- Content for Expense Type -->
+        <div v-if="spending.type === 'expense'">
+          <div class="details">
+            <div class="text-h6">
+              <span>{{ spending.source }}</span>
+            </div>
+            <div class="d-flex">
+              <input type="number" v-model.number="spending.amount" class="amount-input" />
+              <div class="ml-2 text-h6">₽</div>
+            </div>
 
-        <v-btn-toggle color="primary" class="mb-3" style="width: 100%"
-            v-model="createTransactionPayload.TransactionType" divided>
-            <v-btn style="width: 50%" :value="TRANSACTION_TYPES.EXPENSE">Расход</v-btn>
-            <v-btn style="width: 50%" :value="TRANSACTION_TYPES.INCOME">Доход</v-btn>
-        </v-btn-toggle>
-        <div>
-            <div class="mb-1">Счета</div>
-            <v-item-group class="mb-3" v-model="selectedAccount" selected-class="bg-primary">
-                <v-item :value="account.AccountId" v-for="account in normalizedAccounts"
-                    v-slot="{ isSelected, selectedClass, toggle }">
-                    <div :class="['account-item', selectedClass]" dark @click="toggle">
-                        <div class="text-center">
-                            {{ account.AccountName }}
-                        </div>
-                        <div>
-                            {{ account.balance }}
-                        </div>
 
-                    </div>
+            <div>
+              <label>Категория</label>
+              <select v-model="spending.selectedCateg" class="category-select">
+                <option v-for="category in normalizedCategs" :key="category.value" :value="category.value">
+                  {{ category.label }}
+                </option>
+              </select>
+            </div>
+            <div class="text-caption">
+              <span>{{ spending.category }}</span>
+            </div>
+          </div>
 
-                </v-item>
-            </v-item-group>
+          <div class="card-buttons">
+            <VBtn :loading="createTransactionIsPending" class="save-btn" @click="saveTransaction(spending)">
+              Сохранить
+            </VBtn>
+            <!-- <button class="delete-btn" @click="deleteSpending(index)">Delete</button> -->
+          </div>
         </div>
 
-        <div class="mb-1">Сумма</div>
-        <VTextField v-model.number="createTransactionPayload.Amount"></VTextField>
-        <div class="mb-1">Категории</div>
-        <v-item-group class="mb-3" v-model="selectedTransactionCateg" selected-class="bg-primary">
-            <v-row no-gutters>
-                <v-col v-for="categ in categoriesData.list" :key="n" cols="3">
-                    <v-item :value="categ.CategoryId" v-slot="{ isSelected, selectedClass, toggle }">
-                        <v-card :class="['d-flex align-center', selectedClass]" height="50" dark @click="toggle">
-                            <div class="flex-grow-1 text-center">
-                                {{ categ.CategoryName }}
-                            </div>
-                        </v-card>
-                    </v-item>
-                </v-col>
-            </v-row>
-        </v-item-group>
-        <div class="mb-1">Дата</div>
-        <input style="font-size: 18px;" class="mb-2" type="date" v-model="createTransactionPayload.TransactionDate">
-        <VBtn color="primary" block @click="onCreateTransaction">Создать</VBtn>
+        <!-- Content for Income Type -->
+        <div v-else-if="spending.type === 'income'">
+          <TransferForm :transfer-date="selectedDate" :fromAccountId="selectedAccount" :record="spending">
+          </TransferForm>
+        </div>
 
+        <!-- Save and Delete Buttons -->
 
-
-
+      </div>
     </div>
+
+
+
+  </div>
+
+
+
+
+
+
+
 </template>
 
 <script setup lang="ts">
-import { TRANSACTION_LINK_FIELDS, TRANSACTION_TYPES } from "~/consts";
+import { useMutation, useQueries, useQuery } from '@tanstack/vue-query'
 
-const { $apiService } = useNuxtApp();
-const { data: categoriesData, } = useAsyncData("categories/list", () =>
-    $apiService.v1.categoriesDbTableRowList()
-    , { server: false });
 
-const { data: accountbalancesData, refresh: refreshAccountBalances } = useAsyncData("accountbalances/list", () =>
-    $apiService.v1.accountbalancesDbTableRowList()
-    , { server: false });
 
-const { data: accountsData } = useAsyncData("accounts/list", () =>
-    $apiService.v1.accountsDbTableRowList()
-    , { server: false });
+import { ALIAS_TYPE, BANKS, CATEGORIES_TYPE, TRANSACTION_TYPES, type Account, type BankRecordCateged, type Category } from '~/server/types';
+import type { BankRecordWithSelectedCateg } from '~/types';
 
-const normalizedAccounts = computed(() => {
-    // TODO when no account situation
-    if (accountsData.value && accountbalancesData.value) {
-        return accountsData.value.list?.map(account => ({
-            ...account,
-            balance: accountbalancesData.value.list?.find(el => el.AccountId === account.AccountId)?.Balance
-        }))
-    }
-    return []
 
-})
-const getDefaultTransactionPayload = () => ({
-    Amount: 0,
-    Notes: "",
-    TransactionDate: new Date().toLocaleDateString(undefined, { year: 'numeric', day: 'numeric', month: 'numeric' }).split('.').reverse().join('-'),
-    TransactionType: TRANSACTION_TYPES.EXPENSE,
-})
-const createTransactionPayload = ref(getDefaultTransactionPayload());
 
-const selectedTransactionCateg = ref("");
 const selectedAccount = ref("");
+const selectedDate = ref(new Date().toLocaleDateString(undefined, { year: 'numeric', day: 'numeric', month: 'numeric' }).split('.').reverse().join('-'))
+const file = ref<File | null>(null);
+const initParsedResults = ref<BankRecordCateged[] | null>([]);
+
+
+const normalizedParsedResults = computed(() => {
+  if (!initParsedResults.value) return null
+  return initParsedResults.value.map(el => ({ ...el, selectedCateg: el.predictCateg }))
+})
+
+
+const { data: categoriesData } = await useFetch('/api/query', {
+  method: 'POST',
+  body: { query: 'Select * FROM categories' },
+  server: false
+});
 
 
 
-const resetTransactionForm = () => {
-    createTransactionPayload.value = getDefaultTransactionPayload()
-    selectedTransactionCateg.value = ''
-    selectedAccount.value = ''
+
+
+const normalizedCategs = computed(() => {
+  if (!categoriesData.value?.data) return []
+  return categoriesData.value.data.map(el => ({ value: el.category_id, label: el.category_name }))
+})
+
+/*
+  query: `
+        INSERT INTO category_aliases (alias_bank, alias_type, alias_name, category_id)
+                             VALUES ('${BANKS.GPB}', '${ALIAS_TYPE.name}', '${record.source}', '${record.selectedCateg}')`
+
+*/
+const { mutate: addAliasMutation, reset } = useMutation({
+  mutationFn: async (record: BankRecordWithSelectedCateg) => $fetch('/api/category_aliases/list', {
+    method: 'POST',
+    body: {
+      alias_bank: BANKS.GPB,
+      alias_name: record.source,
+      alias_type: ALIAS_TYPE.name,
+      category_id: record.selectedCateg,
+    },
+  })
+  ,
+  onSuccess: () => {
+    useNuxtApp().$toast.success("Алиас для успешно создан", {
+      autoClose: 1000,
+    });
+  },
+  onSettled: () => {
+    setTimeout(() => {
+      reset();
+    }, 1000);
+  },
+});
+
+// ${selectedAccount.value}, '${record.selectedCateg}', ${null}, '${CATEGORIES_TYPE.Expense}', ${record.amount}, '${selectedDate.value}', ${null}, ${record.cashback});
+
+
+const { mutate: addTransactionMutation, reset: resetAddTransaction, isPending: createTransactionIsPending } = useMutation({
+  mutationFn: async (record: BankRecordWithSelectedCateg) => $fetch('/api/transactions/list', {
+    method: 'POST',
+    body: {
+      amount: record.amount,
+      account_id: selectedAccount.value,
+      transaction_type: CATEGORIES_TYPE.Expense,
+      transaction_date: selectedDate.value,
+      category_id: record.selectedCateg,
+      cashback: record.cashback,
+      notes: '',
+    },
+
+  }),
+  onSuccess: () => {
+    useNuxtApp().$toast.success("Транзакция создана", {
+      autoClose: 1000,
+    });
+  },
+  onSettled: () => {
+    setTimeout(() => {
+      resetAddTransaction();
+    }, 1000);
+  },
+});
+
+
+
+const saveTransaction = async (record: BankRecordWithSelectedCateg) => {
+  if (record.selectedCateg !== record.predictCateg) {
+    addAliasMutation(record)
+  }
+  if (!selectedAccount.value) {
+    alert('Выберете аккаунт')
+    return
+  }
+  addTransactionMutation(record)
 }
-const onCreateTransaction = async () => {
-    const response = await $apiService.v1.transactionsCreate(createTransactionPayload.value)
-
-    if (response && response.TransactionId) {
-        await $apiService.v1.transactionsNestedLink(TRANSACTION_LINK_FIELDS.CATEGORIES, String(response.TransactionId),
-            { 'CategoryId': selectedTransactionCateg.value }
-        )
-        await $apiService.v1.transactionsNestedLink(TRANSACTION_LINK_FIELDS.ACCOUNTS, String(response.TransactionId),
-            { 'AccountId': selectedAccount.value }
-        )
-        resetTransactionForm()
-        refreshAccountBalances()
-
-    }
-
-}
 
 
+const handleFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  if (target.files && target.files[0]) {
+    file.value = target.files[0];
+  }
+};
+
+
+
+const {
+  mutateAsync: uploadImageMutate,
+  isPending: isPendinguploadImageMutate,
+} = useMutation({
+  mutationFn: async (formData: FormData) => {
+    const result = await $fetch('/api/image', {
+      method: 'POST',
+      body: formData,
+    });
+    return result
+  },
+  onSettled: () => {
+    setTimeout(() => {
+      reset();
+    }, 1000);
+  },
+});
+
+
+
+const uploadImage = async () => {
+  if (!file.value) return;
+  const formData = new FormData();
+  formData.append('image', file.value);
+  const resp = await uploadImageMutate(formData)
+  initParsedResults.value = resp.data || [];
+
+};
 </script>
 
 
-<style>
-.account-item {
-    width: 60px;
-    font-size: 12px;
-    text-align: center;
-    color: white;
-    background: grey;
-    /* display: flex; */
-    align-items: center;
-    justify-content: center;
+<style scoped>
+.spending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  position: relative;
+  padding: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fff;
+}
+
+.card.income {
+  background-color: #e6f7ff;
+}
+
+.card.expense {
+  background-color: #fff1f0;
+}
+
+.status-indicator {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.cashback-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+
+}
+
+.status-green {
+  background-color: green;
+}
+
+.status-red {
+  background-color: red;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+
+
+.category-select {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.card-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.save-btn,
+.delete-btn {
+  width: 48%;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.save-btn {
+  background-color: #4caf50;
+  color: white;
+}
+
+.delete-btn {
+  background-color: #f44336;
+  color: white;
 }
 </style>

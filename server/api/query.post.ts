@@ -10,10 +10,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<{ query: string }>(event);
 
   if (!body || !body.query) {
-    throw new H3Error({
-      statusCode: 400,
-      message: "No query provided in the request body",
-    });
+    throw new H3Error("No query provided in the request body");
   }
 
   // Database connection configuration
@@ -39,10 +36,7 @@ export default defineEventHandler(async (event) => {
     };
   } catch (error: any) {
     console.error("Database error:", error.message);
-    throw new H3Error({
-      statusCode: 500,
-      message: "Error executing query: " + error.message,
-    });
+    throw new H3Error("Error executing query: " + error.message);
   } finally {
     // Ensure the client is disconnected after the query
     await client.end();

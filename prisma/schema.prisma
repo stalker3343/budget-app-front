@@ -1,0 +1,142 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["views"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model accounts {
+  account_id   Int            @id @default(autoincrement())
+  user_id      Int?
+  account_name String         @db.VarChar(100)
+  created_date DateTime?      @default(now()) @db.Timestamp(6)
+  users        users?         @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  transactions transactions[]
+  is_hidden    Boolean?       @default(false)
+}
+
+model budgets {
+  budget_id     Int           @id @default(autoincrement())
+  user_id       Int?
+  category_id   Int?
+  amount        Decimal       @db.Decimal(15, 2)
+  budget_period budget_period
+  start_date    DateTime      @db.Date
+  end_date      DateTime      @db.Date
+  categories    categories?   @relation(fields: [category_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction)
+  users         users?        @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model categories {
+  category_id                                          Int                @id @default(autoincrement())
+  user_id                                              Int?
+  parent_category_id                                   Int?
+  category_name                                        String             @db.VarChar(100)
+  category_type                                        categories_type
+  budgets                                              budgets[]
+  categories                                           categories?        @relation("categoriesTocategories", fields: [parent_category_id], references: [category_id], onUpdate: NoAction)
+  other_categories                                     categories[]       @relation("categoriesTocategories")
+  users                                                users?             @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  category_aliases                                     category_aliases[]
+  transactions_transactions_category_idTocategories    transactions[]     @relation("transactions_category_idTocategories")
+  transactions_transactions_subcategory_idTocategories transactions[]     @relation("transactions_subcategory_idTocategories")
+}
+
+model category_aliases {
+  id          Int          @id @default(autoincrement())
+  alias_bank  aliases_bank      
+  alias_type  aliases_type
+  alias_name  String       @unique @db.VarChar(100)
+  category_id Int?
+  categories  categories?  @relation(fields: [category_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model debts {
+  debt_id            Int       @id @default(autoincrement())
+  user_id            Int?
+  lender_or_borrower String    @db.VarChar(100)
+  amount             Decimal   @db.Decimal(15, 2)
+  balance            Decimal?  @default(0) @db.Decimal(15, 2)
+  debt_type          debt_type
+  debt_date          DateTime? @default(now()) @db.Timestamp(6)
+  notes              String?
+  users              users?    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model transactions {
+  transaction_id                                     Int              @id @default(autoincrement())
+  account_id                                         Int?
+  category_id                                        Int?
+  subcategory_id                                     Int?
+  transaction_type                                   transaction_type
+  amount                                             Decimal          @db.Decimal(15, 2)
+  transaction_date                                   DateTime         @db.Date             
+  notes                                              String?
+  cashback                                           Decimal?         @db.Decimal(15, 2)
+  accounts                                           accounts?        @relation(fields: [account_id], references: [account_id], onDelete: Cascade, onUpdate: NoAction)
+  categories_transactions_category_idTocategories    categories?      @relation("transactions_category_idTocategories", fields: [category_id], references: [category_id], onUpdate: NoAction)
+  categories_transactions_subcategory_idTocategories categories?      @relation("transactions_subcategory_idTocategories", fields: [subcategory_id], references: [category_id], onUpdate: NoAction)
+}
+
+model users {
+  user_id              Int          @id @default(autoincrement())
+  username             String       @unique @db.VarChar(50)
+  email                String       @unique @db.VarChar(100)
+  password_hash        String       @db.VarChar(255)
+  created_date         DateTime?    @default(now()) @db.Timestamp(6)
+  last_login_date      DateTime?    @db.Timestamp(6)
+  multi_factor_enabled Boolean?     @default(false)
+  accounts             accounts[]
+  budgets              budgets[]
+  categories           categories[]
+  debts                debts[]
+}
+
+view account_balances {
+  account_id   Int  @unique
+  account_name String  @db.VarChar(100)
+  balance      Decimal @db.Decimal
+}
+
+enum aliases_bank {
+  GPB
+  TCS
+}
+
+
+enum aliases_type {
+  name
+  categ
+}
+
+enum budget_period {
+  Weekly
+  Monthly
+  Yearly
+}
+
+enum categories_type {
+  Income
+  Expense
+}
+
+enum debt_type {
+  OwedByUser
+  OwedToUser
+}
+
+enum mood {
+  sad
+  ok
+  happy
+}
+
+enum transaction_type {
+  Income
+  Expense
+  SetIncome
+  SetExpense
+}
