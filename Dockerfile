@@ -2,7 +2,7 @@
 
 ARG NODE_VERSION=20.17.0
 
-FROM node:${NODE_VERSION}-slim as base
+FROM node:${NODE_VERSION} as base
 
 
 
@@ -11,10 +11,6 @@ ARG PORT=3000
 ENV NODE_ENV=production
 
 WORKDIR /src
-
-RUN apt-get update && \
-    apt-get install -y libssl1.1 && \
-    rm -rf /var/lib/apt/lists/*
 
 # Установка pnpm
 RUN npm install -g pnpm
