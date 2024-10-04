@@ -10,6 +10,8 @@ ENV NODE_ENV=production
 
 WORKDIR /src
 
+# Установка pnpm
+RUN npm install -g pnpm
 # Build
 FROM base as build
 
