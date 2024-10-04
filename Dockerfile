@@ -9,6 +9,7 @@ FROM node:${NODE_VERSION} as base
 ARG PORT=3000
 
 ENV NODE_ENV=production
+ENV DATABASE_URL="postgresql://user:password@147.45.103.13:5432/personal-budget-db"
 
 WORKDIR /src
 
@@ -18,7 +19,7 @@ RUN npm install -g pnpm
 FROM base as build
 
 COPY --link package.json pnpm-lock.yaml .
-RUN pnpm install --production=false
+RUN pnpm install --frozen-lockfile
 
 COPY --link . .
 
