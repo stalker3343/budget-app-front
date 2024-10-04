@@ -20,6 +20,11 @@ RUN pnpm install --production=false
 
 COPY --link . .
 
+
+# Генерация Prisma
+RUN pnpm prisma generate
+
+
 RUN pnpm run build
 RUN pnpm prune
 
