@@ -13,13 +13,13 @@ WORKDIR /src
 # Build
 FROM base as build
 
-COPY --link package.json package-lock.json .
-RUN npm install --production=false
+COPY --link package.json pnpm-lock.yaml .
+RUN pnpm install --production=false
 
 COPY --link . .
 
-RUN npm run build
-RUN npm prune
+RUN pnpm run build
+RUN pnpm prune
 
 # Run
 FROM base
